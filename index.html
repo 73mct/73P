@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#080a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>PocketFlip Pro — Mobile Paper Trading HUD</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --bg: #07090e;
+      --card: #0d121d;
+      --card-border: #182232;
+      --accent-green: #10b981;
+      --accent-green-glow: rgba(16, 185, 129, 0.25);
+      --accent-red: #ef4444;
+      --accent-red-glow: rgba(239, 68, 68, 0.2);
+      --accent-cyan: #38bdf8;
+      --text-main: #f1f5f9;
+      --text-muted: #8493a8;
+      --text-dim: #4d5b6e;
+      --font-mono: "SF Mono", "DM Mono", "Courier New", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+      min-height: 100vh;
+      padding-bottom: 70px;
+    }
+
+    /* Top Status Bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(13, 18, 29, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-badge {
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .wallet-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    /* Container */
+    .container {
+      padding: 14px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* FLOATING HUD (Preview / Embedded Controller) */
+    .hud-box {
+      background: #0b111c;
+      border: 1px solid #1e2c42;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .hud-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hud-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.3px;
+    }
+
+    .token-pill {
+      background: #052e16;
+      border: 1px solid #15803d;
+      color: #4ade80;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+
+    .paste-btn {
+      background: #132238;
+      border: 1px solid #233754;
+      color: var(--accent-cyan);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .paste-btn:active { background: #1c3354; }
+
+    .hud-min-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: #172233;
+      border: 1px solid #2a3c57;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    /* Live Stat Row */
+    .hud-metrics {
+      display: grid;
+      grid-template-columns: 1.3fr 1.3fr 1fr;
+      gap: 8px;
+      background: #070b13;
+      border: 1px solid #162030;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }
+
+    .metric-col small {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .metric-col strong {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .metric-cyan { color: var(--accent-cyan); }
+    .metric-green { color: var(--accent-green); }
+    .metric-red { color: var(--accent-red); }
+
+    /* Action Groups */
+    .action-group-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .label-buy { color: var(--accent-green); }
+    .label-sell { color: var(--accent-red); margin-top: 10px; }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .preset-btn {
+      background: #0b1c19;
+      border: 1px solid #134e42;
+      color: #34d399;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 11px;
+      padding: 9px 4px;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .preset-btn:active {
+      transform: scale(0.96);
+      background: #065f46;
+      color: #fff;
+    }
+
+    .preset-btn-sell {
+      background: #201116;
+      border: 1px solid #4c1d29;
+      color: #f87171;
+    }
+    .preset-btn-sell:active {
+      background: #7f1d1d;
+      color: #fff;
+    }
+
+    /* Active Position Banner */
+    .position-banner {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px dashed #059669;
+      border-radius: 8px;
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Floating Draggable Bubble Simulation */
+    #floating-bubble {
+      position: fixed;
+      top: 90px;
+      right: 16px;
+      background: #0a101b;
+      border: 1.5px solid var(--accent-green);
+      border-radius: 30px;
+      padding: 8px 14px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      z-index: 9999;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 14px;
+      gap: 6px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .tab-btn.active {
+      color: #38bdf8;
+      border-bottom-color: #38bdf8;
+    }
+
+    /* Trade List / Journal */
+    .journal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .trade-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .trade-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .token-info {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .token-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      object-fit: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .token-names strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .token-names span {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .trade-pnl-pill {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .trade-details-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      background: #090e17;
+      border: 1px solid #141c2b;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+    }
+
+    .trade-details-grid div small {
+      display: block;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-size: 9px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 10px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Userscript Banner */
+    .info-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .info-card h4 {
+      color: #38bdf8;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .btn-action {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    /* Modal for custom CA or Settings */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: #0f1728;
+      border: 1px solid #202d42;
+      width: 100%;
+      max-width: 420px;
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .modal-content input {
+      width: 100%;
+      background: #080c14;
+      border: 1px solid #1d2b3e;
+      border-radius: 8px;
+      padding: 10px;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      margin: 10px 0;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <header class="top-bar">
+    <div class="brand">
+      <div class="pulse-dot"></div>
+      <span>PocketFlip</span>
+      <span class="brand-badge">HUD v1.2</span>
+    </div>
+    <div class="wallet-pill">
+      <span style="color:var(--text-muted)">Bal:</span>
+      <span id="header-balance" style="color:var(--accent-green);font-weight:700">10.00 SOL</span>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- FLOATING HUD PANEL -->
+    <div class="hud-box" id="main-hud">
+      <div class="hud-header">
+        <div class="hud-title-wrap">
+          <div class="pulse-dot"></div>
+          <span class="hud-title">PocketFlip Floating HUD</span>
+          <span class="token-pill" id="hud-ticker">$WAITING</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="paste-btn" onclick="openCaModal()">Paste CA</button>
+          <button class="hud-min-btn" title="Minimize to Floating Pill" onclick="toggleMinimize()">—</button>
+        </div>
+      </div>
+
+      <!-- Live metrics row -->
+      <div class="hud-metrics">
+        <div class="metric-col">
+          <small>Live Market Cap</small>
+          <strong id="hud-mc">$0.00</strong>
+        </div>
+        <div class="metric-col">
+          <small>Live PnL</small>
+          <strong id="hud-pnl" class="metric-cyan">0.00 SOL</strong>
+        </div>
+        <div class="metric-col">
+          <small>Multiple</small>
+          <strong id="hud-mult" class="metric-cyan">1.00x</strong>
+        </div>
+      </div>
+
+      <!-- Buy Presets -->
+      <div class="action-group-label label-buy">
+        <span>Instant Buy (<span id="chain-currency">SOL</span>)</span>
+        <span style="color:var(--text-dim)" id="hud-bal-info">Bal: 10.00 SOL</span>
+      </div>
+      <div class="preset-grid">
+        <button class="preset-btn" onclick="executeBuy(0.25)">0.25 SOL</button>
+        <button class="preset-btn" onclick="executeBuy(0.5)">0.5 SOL</button>
+        <button class="preset-btn" onclick="executeBuy(1.0)">1.0 SOL</button>
+        <button class="preset-btn" onclick="executeBuy(2.5)">2.5 SOL</button>
+      </div>
+
+      <!-- Sell Presets -->
+      <div class="action-group-label label-sell">
+        <span>Instant Sell (%)</span>
+        <span style="color:var(--text-dim)">Fee: 1%</span>
+      </div>
+      <div class="preset-grid">
+        <button class="preset-btn preset-btn-sell" onclick="executeSell(0.25)">25%</button>
+        <button class="preset-btn preset-btn-sell" onclick="executeSell(0.50)">50%</button>
+        <button class="preset-btn preset-btn-sell" onclick="executeSell(0.75)">75%</button>
+        <button class="preset-btn preset-btn-sell" onclick="executeSell(1.00)">100%</button>
+      </div>
+
+      <!-- Position status -->
+      <div class="position-banner" id="position-banner" style="display:none;">
+        <div>
+          <span style="color:var(--accent-green);font-weight:700">ACTIVE POSITION: </span>
+          <span id="pos-info-text">0.50 SOL invested @ $100K MC</span>
+        </div>
+        <span id="pos-time" style="font-family:var(--font-mono);color:var(--text-muted)">00:00</span>
+      </div>
+    </div>
+
+    <!-- Draggable Floating Bubble (shown when minimized) -->
+    <div id="floating-bubble" onclick="toggleMinimize()">
+      <div class="pulse-dot"></div>
+      <span id="bubble-ticker" style="color:#4ade80;font-weight:700">$MEOW</span>
+      <span style="color:var(--text-muted)">|</span>
+      <span id="bubble-mc">$109.8K</span>
+      <span style="color:var(--text-muted)">|</span>
+      <span id="bubble-pnl" style="color:var(--accent-green)">+0.00 SOL</span>
+      <span id="bubble-mult" style="color:var(--accent-cyan)">1.00x</span>
+    </div>
+
+    <!-- Information / Overlay Script Callout -->
+    <div class="info-card">
+      <h4>⚡ Want this bubble right inside Axiom, Fomo or Dexscreener?</h4>
+      <p style="color:var(--text-muted)">
+        You can use this Web App directly on your phone, or install the <strong>Tampermonkey Userscript</strong> below to inject this exact floating HUD directly over Axiom and Fomo charts!
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+        <button class="btn-action" onclick="copyUserscript()">📋 Copy Tampermonkey Script</button>
+        <button class="btn-action" onclick="resetWallet()">🔄 Reset Balance (10 SOL)</button>
+        <button class="btn-action" onclick="exportData()">💾 Export Journal (JSON)</button>
+      </div>
+    </div>
+
+    <!-- Nav tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" id="tab-journal-btn" onclick="switchTab('journal')">📓 Closed Trades (<span id="journal-count">0</span>)</button>
+      <button class="tab-btn" id="tab-analytics-btn" onclick="switchTab('analytics')">📊 Performance Stats</button>
+    </div>
+
+    <!-- Tab 1: Journal -->
+    <div id="tab-journal" class="journal-list">
+      <div class="empty-state" id="journal-empty">No closed trades yet. Enter a token CA above and execute a paper buy!</div>
+    </div>
+
+    <!-- Tab 2: Analytics -->
+    <div id="tab-analytics" style="display:none;">
+      <div class="trade-card">
+        <div style="font-size:12px;color:var(--text-muted)">Paper Account Overview</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;">
+          <div><small style="color:var(--text-dim);display:block">TOTAL TRADES</small><strong id="stat-total" style="font-size:16px">0</strong></div>
+          <div><small style="color:var(--text-dim);display:block">WIN RATE</small><strong id="stat-winrate" style="font-size:16px;color:var(--accent-green)">0%</strong></div>
+          <div><small style="color:var(--text-dim);display:block">NET PnL</small><strong id="stat-net-pnl" style="font-size:16px">0.00 SOL</strong></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CA Input Modal -->
+  <div class="modal-backdrop" id="ca-modal">
+    <div class="modal-content">
+      <div style="font-size:14px;font-weight:700">Paste Contract Address (CA)</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Supports Solana, Base, Ethereum, BSC & Pump.fun links</div>
+      <input type="text" id="ca-input" placeholder="Paste Solana / EVM token CA..." autocomplete="off" spellcheck="false">
+      <div class="modal-actions">
+        <button class="btn-action" onclick="closeCaModal()">Cancel</button>
+        <button class="btn-action" style="background:#059669;border-color:#10b981;color:#fff" onclick="loadTokenFromInput()">Fetch Token</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- STATE CONFIG ---
+    let state = {
+      balance: 10.00,
+      currency: "SOL",
+      token: null,
+      position: null,
+      closedTrades: [],
+      pollTimer: null,
+      posTimer: null,
+      isMinimized: false
+    };
+
+    // Load from LocalStorage
+    try {
+      const saved = localStorage.getItem("pocketflip_state");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        state.balance = parsed.balance ?? 10.00;
+        state.closedTrades = parsed.closedTrades ?? [];
+        if (parsed.token) state.token = parsed.token;
+        if (parsed.position) state.position = parsed.position;
+      }
+    } catch(e) {}
+
+    function saveState() {
+      try {
+        localStorage.setItem("pocketflip_state", JSON.stringify({
+          balance: state.balance,
+          closedTrades: state.closedTrades,
+          token: state.token,
+          position: state.position
+        }));
+      } catch(e) {}
+    }
+
+    // Initialize UI
+    function init() {
+      updateWalletUI();
+      renderJournal();
+      if (state.token) {
+        updateTokenUI();
+        startPolling();
+      }
+      if (state.position) {
+        startPositionTimer();
+        updatePositionBanner();
+      }
+    }
+
+    function updateWalletUI() {
+      document.getElementById("header-balance").textContent = `${state.balance.toFixed(2)} ${state.currency}`;
+      document.getElementById("hud-bal-info").textContent = `Bal: ${state.balance.toFixed(2)} ${state.currency}`;
+    }
+
+    // Modal controls
+    function openCaModal() {
+      document.getElementById("ca-modal").style.display = "flex";
+      setTimeout(() => document.getElementById("ca-input").focus(), 100);
+      // Try clipboard auto-read if permitted
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(text => {
+          if (text && text.length > 25 && !text.includes(" ")) {
+            document.getElementById("ca-input").value = text.trim();
+          }
+        }).catch(()=>{});
+      }
+    }
+
+    function closeCaModal() {
+      document.getElementById("ca-modal").style.display = "none";
+    }
+
+    async function loadTokenFromInput() {
+      const val = document.getElementById("ca-input").value.trim();
+      if (!val) return;
+      closeCaModal();
+      await fetchTokenData(val);
+    }
+
+    // --- DEXSCREENER REAL-TIME POLLING ENGINE (Cache-busted) ---
+    async function fetchTokenData(ca) {
+      document.getElementById("hud-ticker").textContent = "$FETCHING...";
+      try {
+        // Strip out DEX URLs if pasted directly
+        let cleanCA = ca;
+        if (ca.includes("/")) {
+          const parts = ca.split("/");
+          cleanCA = parts[parts.length - 1].split("?")[0];
+        }
+
+        // Cache buster timestamp & no-store
+        const ts = Date.now();
+        const url = `https://api.dexscreener.com/latest/dex/tokens/${cleanCA}?_t=${ts}`;
+        const res = await fetch(url, { cache: "no-store" });
+        const data = await res.json();
+
+        if (!data.pairs || data.pairs.length === 0) {
+          // Fallback search
+          const fallbackRes = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${cleanCA}&_t=${ts}`, { cache: "no-store" });
+          const fallbackData = await fallbackRes.json();
+          if (!fallbackData.pairs || fallbackData.pairs.length === 0) {
+            alert("Token pair not found on DexScreener yet. Make sure the CA is correct or has liquidity.");
+            document.getElementById("hud-ticker").textContent = "$NOT_FOUND";
+            return;
+          }
+          data.pairs = fallbackData.pairs;
+        }
+
+        // Pick pair with highest liquidity
+        const pairs = data.pairs.sort((a,b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+        const bestPair = pairs[0];
+
+        const chain = bestPair.chainId || "solana";
+        let cur = "SOL";
+        if (chain === "ethereum" || chain === "base") cur = "ETH";
+        else if (chain === "bsc") cur = "BNB";
+
+        state.currency = cur;
+        document.getElementById("chain-currency").textContent = cur;
+
+        state.token = {
+          ca: cleanCA,
+          name: bestPair.baseToken.name,
+          symbol: bestPair.baseToken.symbol,
+          priceUsd: parseFloat(bestPair.priceUsd) || 0,
+          marketCap: bestPair.marketCap || bestPair.fdv || 0,
+          pairAddress: bestPair.pairAddress,
+          chainId: chain,
+          imageUrl: bestPair.info?.imageUrl || null,
+          lastUpdated: Date.now()
+        };
+
+        saveState();
+        updateTokenUI();
+        startPolling();
+
+      } catch (err) {
+        console.error("DexScreener API error:", err);
+        document.getElementById("hud-ticker").textContent = "$ERROR";
+      }
+    }
+
+    function updateTokenUI() {
+      if (!state.token) return;
+      const t = state.token;
+      document.getElementById("hud-ticker").textContent = `$${t.symbol.toUpperCase()}`;
+      document.getElementById("bubble-ticker").textContent = `$${t.symbol.toUpperCase()}`;
+
+      // Format MC
+      const mcFormatted = formatMoney(t.marketCap);
+      document.getElementById("hud-mc").textContent = mcFormatted;
+      document.getElementById("bubble-mc").textContent = mcFormatted;
+
+      // Update PnL & multiple if position is active
+      if (state.position) {
+        const entryMc = state.position.entryMarketCap;
+        const currentMc = t.marketCap;
+        const mult = entryMc > 0 ? (currentMc / entryMc) : 1.0;
+        const invested = state.position.currentAmount;
+        const pnl = (invested * mult) - invested;
+
+        const multStr = `${mult.toFixed(2)}x`;
+        const pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(3)} ${state.currency}`;
+
+        document.getElementById("hud-mult").textContent = multStr;
+        document.getElementById("hud-pnl").textContent = pnlStr;
+        document.getElementById("hud-pnl").className = pnl >= 0 ? "metric-green" : "metric-red";
+
+        document.getElementById("bubble-mult").textContent = multStr;
+        document.getElementById("bubble-pnl").textContent = pnlStr;
+        document.getElementById("bubble-pnl").style.color = pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+
+        // Track peak MC reached during trade
+        if (currentMc > state.position.maxMarketCap) {
+          state.position.maxMarketCap = currentMc;
+          saveState();
+        }
+      } else {
+        document.getElementById("hud-mult").textContent = "1.00x";
+        document.getElementById("hud-pnl").textContent = `0.00 ${state.currency}`;
+        document.getElementById("hud-pnl").className = "metric-cyan";
+        document.getElementById("bubble-mult").textContent = "1.00x";
+        document.getElementById("bubble-pnl").textContent = `0.00 ${state.currency}`;
+      }
+    }
+
+    function startPolling() {
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(async () => {
+        if (!state.token || !state.token.ca) return;
+        try {
+          const ts = Date.now();
+          const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${state.token.ca}?_t=${ts}`, { cache: "no-store" });
+          const data = await res.json();
+          if (data.pairs && data.pairs.length > 0) {
+            const pairs = data.pairs.sort((a,b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+            const best = pairs[0];
+            state.token.priceUsd = parseFloat(best.priceUsd) || state.token.priceUsd;
+            state.token.marketCap = best.marketCap || best.fdv || state.token.marketCap;
+            state.token.lastUpdated = ts;
+            updateTokenUI();
+          }
+        } catch(e) {}
+      }, 1500); // 1.5s live polling
+    }
+
+    // --- PAPER TRADING EXECUTION ---
+    function executeBuy(amount) {
+      if (!state.token) {
+        alert("Please paste a token Contract Address (CA) first!");
+        openCaModal();
+        return;
+      }
+      if (state.balance < amount) {
+        alert("Insufficient balance! Tap 'Reset Balance' below if needed.");
+        return;
+      }
+
+      state.balance -= amount;
+      updateWalletUI();
+
+      if (!state.position) {
+        state.position = {
+          tokenCa: state.token.ca,
+          tokenSymbol: state.token.symbol,
+          tokenName: state.token.name,
+          imageUrl: state.token.imageUrl,
+          initialAmount: amount,
+          currentAmount: amount,
+          entryMarketCap: state.token.marketCap,
+          entryPriceUsd: state.token.priceUsd,
+          maxMarketCap: state.token.marketCap,
+          openedAt: Date.now(),
+          realizedPnl: 0
+        };
+      } else {
+        // Average into position
+        const totalAmount = state.position.currentAmount + amount;
+        const avgMc = ((state.position.currentAmount * state.position.entryMarketCap) + (amount * state.token.marketCap)) / totalAmount;
+        state.position.currentAmount = totalAmount;
+        state.position.initialAmount += amount;
+        state.position.entryMarketCap = avgMc;
+      }
+
+      saveState();
+      startPositionTimer();
+      updatePositionBanner();
+      updateTokenUI();
+    }
+
+    function executeSell(pct) {
+      if (!state.position) {
+        alert("No active position to sell!");
+        return;
+      }
+
+      const sellAmount = state.position.currentAmount * pct;
+      const currentMc = state.token.marketCap;
+      const mult = state.position.entryMarketCap > 0 ? (currentMc / state.position.entryMarketCap) : 1.0;
+      const proceeds = sellAmount * mult;
+      const pnlSlice = proceeds - sellAmount;
+
+      // Fee deduction (1%)
+      const fee = proceeds * 0.01;
+      const netProceeds = proceeds - fee;
+
+      state.balance += netProceeds;
+      state.position.realizedPnl += pnlSlice;
+      state.position.currentAmount -= sellAmount;
+
+      if (pct >= 0.999 || state.position.currentAmount <= 0.001) {
+        // Position Closed 100% -> Log to Journal
+        const durationSec = Math.round((Date.now() - state.position.openedAt) / 1000);
+        const finalMultiple = state.position.entryMarketCap > 0 ? (currentMc / state.position.entryMarketCap) : 1.0;
+        const peakMultiple = state.position.entryMarketCap > 0 ? (state.position.maxMarketCap / state.position.entryMarketCap) : 1.0;
+
+        const closedRecord = {
+          id: Date.now(),
+          name: state.position.tokenName,
+          symbol: state.position.tokenSymbol,
+          ca: state.position.tokenCa,
+          imageUrl: state.position.imageUrl,
+          invested: state.position.initialAmount,
+          realizedPnl: state.position.realizedPnl,
+          multiple: finalMultiple,
+          peakMultiple: peakMultiple,
+          entryMc: state.position.entryMarketCap,
+          exitMc: currentMc,
+          peakMc: state.position.maxMarketCap,
+          durationSec: durationSec,
+          closedAt: Date.now(),
+          currency: state.currency
+        };
+
+        state.closedTrades.unshift(closedRecord);
+        state.position = null;
+        if (state.posTimer) clearInterval(state.posTimer);
+        document.getElementById("position-banner").style.display = "none";
+      } else {
+        updatePositionBanner();
+      }
+
+      saveState();
+      updateWalletUI();
+      renderJournal();
+      updateTokenUI();
+    }
+
+    function updatePositionBanner() {
+      if (!state.position) return;
+      document.getElementById("position-banner").style.display = "flex";
+      document.getElementById("pos-info-text").textContent = 
+        `${state.position.currentAmount.toFixed(2)} ${state.currency} @ ${formatMoney(state.position.entryMarketCap)} MC`;
+    }
+
+    function startPositionTimer() {
+      if (state.posTimer) clearInterval(state.posTimer);
+      state.posTimer = setInterval(() => {
+        if (!state.position) return;
+        const sec = Math.floor((Date.now() - state.position.openedAt) / 1000);
+        const m = Math.floor(sec / 60).toString().padStart(2, "0");
+        const s = (sec % 60).toString().padStart(2, "0");
+        document.getElementById("pos-time").textContent = `${m}:${s}`;
+      }, 1000);
+    }
+
+    // Minimize / Expand Floating Bubble
+    function toggleMinimize() {
+      state.isMinimized = !state.isMinimized;
+      const hud = document.getElementById("main-hud");
+      const bubble = document.getElementById("floating-bubble");
+
+      if (state.isMinimized) {
+        hud.style.display = "none";
+        bubble.style.display = "flex";
+      } else {
+        hud.style.display = "block";
+        bubble.style.display = "none";
+      }
+    }
+
+    // Draggable Floating Bubble Setup for Mobile & Desktop
+    (function makeDraggable() {
+      const el = document.getElementById("floating-bubble");
+      let isDragging = false, startX, startY, origX, origY;
+
+      function onPointerDown(e) {
+        isDragging = true;
+        startX = e.clientX || e.touches[0].clientX;
+        startY = e.clientY || e.touches[0].clientY;
+        const rect = el.getBoundingClientRect();
+        origX = rect.left;
+        origY = rect.top;
+      }
+
+      function onPointerMove(e) {
+        if (!isDragging) return;
+        const cx = e.clientX || e.touches[0].clientX;
+        const cy = e.clientY || e.touches[0].clientY;
+        const dx = cx - startX;
+        const dy = cy - startY;
+        el.style.left = `${origX + dx}px`;
+        el.style.top = `${origY + dy}px`;
+        el.style.right = "auto";
+      }
+
+      function onPointerUp() { isDragging = false; }
+
+      el.addEventListener("mousedown", onPointerDown);
+      document.addEventListener("mousemove", onPointerMove);
+      document.addEventListener("mouseup", onPointerUp);
+
+      el.addEventListener("touchstart", onPointerDown, {passive: true});
+      document.addEventListener("touchmove", onPointerMove, {passive: true});
+      document.addEventListener("touchend", onPointerUp);
+    })();
+
+    // --- JOURNAL & ANALYTICS RENDERING ---
+    function renderJournal() {
+      const list = document.getElementById("tab-journal");
+      const empty = document.getElementById("journal-empty");
+      document.getElementById("journal-count").textContent = state.closedTrades.length;
+
+      // Update analytics stats
+      let wins = 0, totalPnl = 0;
+      state.closedTrades.forEach(t => {
+        if (t.realizedPnl > 0) wins++;
+        totalPnl += t.realizedPnl;
+      });
+      document.getElementById("stat-total").textContent = state.closedTrades.length;
+      document.getElementById("stat-winrate").textContent = state.closedTrades.length ? `${Math.round((wins / state.closedTrades.length)*100)}%` : "0%";
+      document.getElementById("stat-net-pnl").textContent = `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(3)} ${state.currency}`;
+      document.getElementById("stat-net-pnl").style.color = totalPnl >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+
+      if (state.closedTrades.length === 0) {
+        if (empty) empty.style.display = "block";
+        return;
+      }
+      if (empty) empty.style.display = "none";
+
+      const html = state.closedTrades.map(trade => {
+        const isWin = trade.realizedPnl >= 0;
+        const minStr = Math.floor(trade.durationSec / 60);
+        const secStr = trade.durationSec % 60;
+        const durationText = `${minStr}m ${secStr}s`;
+        const avatar = trade.imageUrl 
+          ? `<img class="token-avatar" src="${trade.imageUrl}" onerror="this.outerHTML='<div class=\'token-avatar\'>${trade.symbol.slice(0,2)}</div>'">`
+          : `<div class="token-avatar">${trade.symbol.slice(0,2)}</div>`;
+
+        return `
+          <div class="trade-card">
+            <div class="trade-card-top">
+              <div class="token-info">
+                ${avatar}
+                <div class="token-names">
+                  <strong>$${trade.symbol} <span style="font-weight:400;color:var(--text-dim)">(${trade.name})</span></strong>
+                  <span>${trade.ca.slice(0,6)}...${trade.ca.slice(-4)}</span>
+                </div>
+              </div>
+              <div class="trade-pnl-pill" style="color:${isWin ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                ${isWin ? '+' : ''}${trade.realizedPnl.toFixed(3)} ${trade.currency}
+                <div style="font-size:11px;color:var(--accent-cyan);font-weight:500">${trade.multiple.toFixed(2)}x</div>
+              </div>
+            </div>
+            <div class="trade-details-grid">
+              <div><small>Entry MC</small>${formatMoney(trade.entryMc)}</div>
+              <div><small>Exit MC</small>${formatMoney(trade.exitMc)}</div>
+              <div><small>Peak Reached</small><span style="color:#f4ce83">${formatMoney(trade.peakMc)} (${trade.peakMultiple.toFixed(2)}x)</span></div>
+              <div><small>Invested</small>${trade.invested.toFixed(2)} ${trade.currency}</div>
+              <div><small>Hold Time</small>${durationText}</div>
+              <div><small>Closed</small>${new Date(trade.closedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      list.innerHTML = html;
+    }
+
+    function switchTab(t) {
+      document.getElementById("tab-journal-btn").classList.toggle("active", t === "journal");
+      document.getElementById("tab-analytics-btn").classList.toggle("active", t === "analytics");
+      document.getElementById("tab-journal").style.display = t === "journal" ? "flex" : "none";
+      document.getElementById("tab-analytics").style.display = t === "analytics" ? "block" : "none";
+    }
+
+    function formatMoney(n) {
+      if (!n || isNaN(n)) return "$0.00";
+      if (n >= 1e9) return `$${(n/1e9).toFixed(2)}B`;
+      if (n >= 1e6) return `$${(n/1e6).toFixed(2)}M`;
+      if (n >= 1e3) return `$${(n/1e3).toFixed(1)}K`;
+      return `$${Number(n).toFixed(2)}`;
+    }
+
+    function resetWallet() {
+      if (confirm("Reset paper wallet back to 10.00 SOL?")) {
+        state.balance = 10.00;
+        updateWalletUI();
+        saveState();
+      }
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `pocketflip-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    }
+
+    function copyUserscript() {
+      const scriptCode = `// ==UserScript==\n// @name         PocketFlip Overlay for Axiom & Fomo\n// @namespace    https://pocketflip.app/\n// @version      1.2\n// @description  Floating Mobile Paper Trading HUD for Axiom, Fomo, Pump.fun and Dexscreener\n// @match        *://*.axiom.trade/*\n// @match        *://*.fomo.fund/*\n// @match        *://*.pump.fun/*\n// @match        *://*.dexscreener.com/*\n// @grant        none\n// ==/UserScript==\n(function(){var iframe=document.createElement('iframe');iframe.src='https://your-github-username.github.io/pocketflip/';iframe.style.position='fixed';iframe.style.bottom='20px';iframe.style.right='20px';iframe.style.width='320px';iframe.style.height='280px';iframe.style.border='none';iframe.style.zIndex='9999999';iframe.style.borderRadius='16px';iframe.style.boxShadow='0 10px 30px rgba(0,0,0,0.8)';document.body.appendChild(iframe);})();`;
+      navigator.clipboard.writeText(scriptCode).then(() => alert("Userscript copied! Install in Kiwi Browser / Tampermonkey.")).catch(() => alert("Clipboard denied"));
+    }
+
+    // Run on load
+    window.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
